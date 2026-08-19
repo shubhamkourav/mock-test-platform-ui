@@ -44,12 +44,14 @@ describe('attempt integration contracts', () => {
     expect(response.attempt._id).toBe('attempt-1');
   });
 
-  it('preserves server authorization and expiration errors', async () => {
+  it('preserves server authorization, not-found, and expiration errors', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ success: false, message: 'Forbidden', code: 'FORBIDDEN' }, 403))
+      .mockResolvedValueOnce(jsonResponse({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' }, 404))
       .mockResolvedValueOnce(jsonResponse({ success: false, message: 'Attempt deadline has passed', code: 'ATTEMPT_EXPIRED' }, 409));
 
     await expect(attemptsApi.get('attempt-1')).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    await expect(attemptsApi.get('attempt-1')).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
     await expect(attemptsApi.submit('attempt-1')).rejects.toMatchObject({ status: 409, code: 'ATTEMPT_EXPIRED' });
   });
 
@@ -74,5 +76,7 @@ describe('attempt integration contracts', () => {
     expect(response.answers[0]).not.toHaveProperty('correctOptions');
     expect(response.answers[0]).not.toHaveProperty('isCorrect');
     expect(response.answers[0]).not.toHaveProperty('marksObtained');
+    expect(response.answers[0]).not.toHaveProperty('questionSnapshot');
+    expect(response.answers[0]).not.toHaveProperty('score');
   });
 });
