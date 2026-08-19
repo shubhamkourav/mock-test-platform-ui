@@ -6,7 +6,9 @@ import { getAttemptDeadline, getRemainingSeconds, useAttemptTimer } from './useA
 
 function TimerHarness({ deadline, active, onChange }: { deadline: number | null; active: boolean; onChange: (seconds: number) => void }) {
   const { remainingSeconds } = useAttemptTimer(deadline, active);
-  useEffect(() => onChange(remainingSeconds), [onChange, remainingSeconds]);
+  useEffect(() => {
+    onChange(remainingSeconds);
+  }, [onChange, remainingSeconds]);
   return null;
 }
 
