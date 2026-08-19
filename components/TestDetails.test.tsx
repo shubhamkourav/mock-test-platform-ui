@@ -7,6 +7,7 @@ import { ApiClientError } from '../lib/api';
 import { attemptsApi } from '../lib/api/attempts';
 import { testsApi } from '../lib/api/tests';
 import { examsApi } from '../lib/api/exams';
+import type { StartAttemptResponse } from '../types/attempt';
 
 const push = vi.fn();
 
@@ -49,6 +50,26 @@ const examData = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
+
+const attemptResponse = (id: string, resumed: boolean): StartAttemptResponse => ({
+  attempt: {
+    _id: id,
+    userId: 'user-1',
+    testId: 'test-1',
+    startTime: '2026-01-01T00:00:00.000Z',
+    totalScore: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    unattemptedCount: 10,
+    timeTakenSeconds: 0,
+    status: 'in_progress',
+    sectionResults: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  questions: [],
+  resumed,
+});
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -93,8 +114,8 @@ describe('TestDetails attempt lifecycle', () => {
   });
 
   it('creates an attempt only after an explicit click and disables the button while pending', async () => {
-    const request = deferred<{ attempt: { _id: string } }>();
-    vi.mocked(attemptsApi.start).mockReturnValue(request.promise as ReturnType<typeof attemptsApi.start>);
+    const request = deferred<StartAttemptResponse>();
+    vi.mocked(attemptsApi.start).mockReturnValue(request.promise);
     root = createRoot(container);
     const button = await renderTestDetails(root, container);
     expect(button).not.toBeNull();
@@ -111,14 +132,14 @@ describe('TestDetails attempt lifecycle', () => {
     expect(attemptsApi.start).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      request.resolve({ attempt: { _id: 'attempt-1' } });
+      request.resolve(attemptResponse('attempt-1', false));
       await Promise.resolve();
     });
     expect(push).toHaveBeenCalledWith('/attempt/attempt-1');
   });
 
   it('uses the returned attempt id for a resumed attempt', async () => {
-    vi.mocked(attemptsApi.start).mockResolvedValue({ attempt: { _id: 'attempt-existing' }, questions: [], resumed: true });
+    vi.mocked(attemptsApi.start).mockResolvedValue(attemptResponse('attempt-existing', true));
     root = createRoot(container);
     const button = await renderTestDetails(root, container);
 
