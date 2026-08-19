@@ -24,25 +24,36 @@ vi.mock('../lib/api/exams', () => ({ examsApi: { get: vi.fn(), listSections: vi.
 const testData = {
   _id: 'test-1',
   examId: 'exam-1',
+  stage: 'stage-1',
   title: 'Mock Test',
   type: 'full_mock' as const,
-  description: 'Test',
   totalQuestions: 10,
   totalMarks: 100,
   durationMinutes: 60,
   difficulty: 'medium' as const,
   sections: [],
-  questions: [],
+  settings: { shuffleQuestions: false, shuffleOptions: false, allowResume: true },
   isPublished: true,
+  createdBy: 'admin-1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  questions: [],
 };
 
-const examData = { _id: 'exam-1', name: 'Exam', description: 'Exam description', isActive: true };
+const examData = {
+  _id: 'exam-1',
+  name: 'Exam',
+  slug: 'exam',
+  category: 'general',
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
-  return { promise, resolve, reject };
+  const promise = new Promise<T>((res) => { resolve = res; });
+  return { promise, resolve };
 }
 
 async function renderTestDetails(root: Root, container: HTMLDivElement) {
@@ -83,7 +94,7 @@ describe('TestDetails attempt lifecycle', () => {
 
   it('creates an attempt only after an explicit click and disables the button while pending', async () => {
     const request = deferred<{ attempt: { _id: string } }>();
-    vi.mocked(attemptsApi.start).mockReturnValue(request.promise);
+    vi.mocked(attemptsApi.start).mockReturnValue(request.promise as ReturnType<typeof attemptsApi.start>);
     root = createRoot(container);
     const button = await renderTestDetails(root, container);
     expect(button).not.toBeNull();
@@ -121,7 +132,7 @@ describe('TestDetails attempt lifecycle', () => {
   });
 
   it('renders a friendly start error and remains retryable', async () => {
-    vi.mocked(attemptsApi.start).mockRejectedValue(new ApiClientError('Forbidden', 403, 'FORBIDDEN'));
+    vi.mocked(attemptsApi.start).mockRejectedValue(new ApiClientError(403, 'Forbidden', 'FORBIDDEN'));
     root = createRoot(container);
     const button = await renderTestDetails(root, container);
 
