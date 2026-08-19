@@ -9,10 +9,12 @@ import { testsApi } from '../lib/api/tests';
 import { examsApi } from '../lib/api/exams';
 import type { StartAttemptResponse } from '../types/attempt';
 
-const push = vi.fn();
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
-vi.mock('next/link', () => ({ default: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => <a {...props}>{children}</a> }));
+vi.mock('next/link', () => ({
+  default: ({ children, href }: React.PropsWithChildren<{ href?: string }>) => <a href={href}>{children}</a>,
+}));
 vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren) => <>{children}</> }));
 vi.mock('./DiscoveryStates', () => ({
   DiscoveryLoading: () => <div>Loading</div>,
