@@ -110,6 +110,25 @@ describe('typed domain API modules', () => {
     expect((await testsApi.unpublish('test-1')).isPublished).toBe(false);
   });
 
+  it('uses student-safe test discovery without requesting unpublished tests', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({
+      success: true,
+      message: 'OK',
+      data: [{ _id: 'test-1', examId: 'exam-1', title: 'Published mock', type: 'full_mock', totalQuestions: 1, totalMarks: 1, durationMinutes: 10, difficulty: 'mixed', sections: [], settings: { shuffleQuestions: false, shuffleOptions: false, allowResume: true }, isPublished: true, createdBy: 'admin-1', createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
+    }));
+
+    const tests = await testsApi.list('exam-1');
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toBe('http://localhost:5000/api/v1/tests?examId=exam-1');
+    expect(url).not.toContain('includeUnpublished');
+    expect(tests.every((test) => test.isPublished)).toBe(true);
+  });
+
+  it('supports test-not-found responses for the test detail flow', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(jsonResponse({ success: false, message: 'Test not found', code: 'TEST_NOT_FOUND' }, 404));
+    await expect(testsApi.get('missing-test')).rejects.toMatchObject({ status: 404, code: 'TEST_NOT_FOUND' });
+  });
+
   it('supports attempt lifecycle and result contracts', async () => {
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(jsonResponse({ success: true, message: 'Attempt started', data: { attempt: { _id: 'attempt-1', userId: 'user-1', testId: 'test-1', startTime: '2026-01-01T00:00:00.000Z', totalScore: 0, correctCount: 0, incorrectCount: 0, unattemptedCount: 1, timeTakenSeconds: 0, status: 'in_progress', sectionResults: [], createdAt: '2026-01-01', updatedAt: '2026-01-01' }, questions: [] } }))
