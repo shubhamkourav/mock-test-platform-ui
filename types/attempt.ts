@@ -69,6 +69,7 @@ export interface SaveAnswerResponse extends AttemptAnswer {}
 export interface StartAttemptResponse {
   attempt: Attempt;
   questions: AttemptQuestion[];
+  resumed: boolean;
 }
 
 export interface AttemptResponse {
