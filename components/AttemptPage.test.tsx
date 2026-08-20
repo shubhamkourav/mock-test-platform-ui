@@ -75,18 +75,19 @@ describe('AttemptPage test-taking experience', () => {
     await flush();
 
     await act(async () => { button(container, 'Submit Test').click(); });
-    let dialogSubmit = Array.from(container.querySelectorAll('button')).filter((item) => item.textContent?.trim() === 'Submit Test').at(-1) as HTMLButtonElement;
-    await act(async () => { await vi.waitFor(() => expect(dialogSubmit).toBeTruthy()); });
+    const dialogSubmit = () => Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === 'Submit Test' && item.closest('[role="dialog"]')) as HTMLButtonElement | undefined;
+    await vi.waitFor(() => expect(dialogSubmit()).toBeTruthy());
 
-    await act(async () => { dialogSubmit.click(); });
-    await act(async () => { await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledTimes(1)); });
+    await act(async () => { dialogSubmit()!.click(); });
+    await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledTimes(1));
 
-    dialogSubmit = Array.from(container.querySelectorAll('button')).filter((item) => item.textContent?.trim() === 'Submit Test').at(-1) as HTMLButtonElement;
-    expect(dialogSubmit.disabled).toBe(true);
-    await act(async () => { dialogSubmit.click(); });
+    const pendingDialogSubmit = dialogSubmit();
+    expect(pendingDialogSubmit?.disabled).toBe(true);
+    await act(async () => { pendingDialogSubmit?.click(); });
     expect(attemptsApi.submit).toHaveBeenCalledTimes(1);
 
-    await act(async () => { resolveSubmit(attempt); await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/attempt/attempt-1/result')); });
+    await act(async () => { resolveSubmit(attempt); });
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/attempt/attempt-1/result'));
   });
   it('handles 409 ATTEMPT_EXPIRED through the server result', async () => {
     vi.mocked(attemptsApi.submit).mockRejectedValueOnce(new ApiClientError(409, 'Expired', 'ATTEMPT_EXPIRED'));
@@ -95,13 +96,13 @@ describe('AttemptPage test-taking experience', () => {
     await flush();
 
     await act(async () => { button(container, 'Submit Test').click(); });
-    const dialogSubmit = Array.from(container.querySelectorAll('button')).filter((item) => item.textContent?.trim() === 'Submit Test').at(-1) as HTMLButtonElement;
-    await act(async () => { await vi.waitFor(() => expect(dialogSubmit).toBeTruthy()); });
-    await act(async () => { dialogSubmit.click(); });
+    const dialogSubmit = () => Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === 'Submit Test' && item.closest('[role="dialog"]')) as HTMLButtonElement | undefined;
+    await vi.waitFor(() => expect(dialogSubmit()).toBeTruthy());
+    await act(async () => { dialogSubmit()!.click(); });
 
-    await act(async () => { await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledWith('attempt-1')); });
-    await act(async () => { await vi.waitFor(() => expect(attemptsApi.result).toHaveBeenCalledWith('attempt-1')); });
-    await act(async () => { await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/attempt/attempt-1/result')); });
+    await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledWith('attempt-1'));
+    await vi.waitFor(() => expect(attemptsApi.result).toHaveBeenCalledWith('attempt-1'));
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/attempt/attempt-1/result'));
   });
   it('handles 404 and 403 loading errors', async () => { vi.mocked(attemptsApi.get).mockRejectedValueOnce(new ApiClientError(404, 'Not found')); root = createRoot(container); await renderPage(root); await flush(); expect(container.textContent).toContain('could not be found'); root.unmount(); root = createRoot(container); vi.mocked(attemptsApi.get).mockRejectedValueOnce(new ApiClientError(403, 'Forbidden')); await renderPage(root); await flush(); expect(container.textContent).toContain('not authorized'); });
   it('shows an explicit recovery state when direct navigation has no cached questions', async () => { window.sessionStorage.clear(); root = createRoot(container); await renderPage(root); await flush(); expect(container.textContent).toContain('Question data is not available'); expect(attemptsApi.start).not.toHaveBeenCalled(); });
