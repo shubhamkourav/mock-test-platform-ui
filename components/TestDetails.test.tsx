@@ -1,0 +1,170 @@
+import React from 'react';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { TestDetails } from './TestDetails';
+import { ApiClientError } from '../lib/api';
+import { attemptsApi } from '../lib/api/attempts';
+import { testsApi } from '../lib/api/tests';
+import { examsApi } from '../lib/api/exams';
+import type { StartAttemptResponse } from '../types/attempt';
+
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('next/link', () => ({
+  default: ({ children, href }: React.PropsWithChildren<{ href?: string }>) => <a href={href}>{children}</a>,
+}));
+vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren) => <>{children}</> }));
+vi.mock('./DiscoveryStates', () => ({
+  DiscoveryLoading: () => <div>Loading</div>,
+  DiscoveryError: ({ message }: { message: string }) => <div>{message}</div>,
+}));
+vi.mock('../lib/api/attempts', () => ({ attemptsApi: { start: vi.fn() } }));
+vi.mock('../lib/api/tests', () => ({ testsApi: { get: vi.fn() } }));
+vi.mock('../lib/api/exams', () => ({ examsApi: { get: vi.fn(), listSections: vi.fn() } }));
+
+const testData = {
+  _id: 'test-1',
+  examId: 'exam-1',
+  stage: 'stage-1',
+  title: 'Mock Test',
+  type: 'full_mock' as const,
+  totalQuestions: 10,
+  totalMarks: 100,
+  durationMinutes: 60,
+  difficulty: 'medium' as const,
+  sections: [],
+  settings: { shuffleQuestions: false, shuffleOptions: false, allowResume: true },
+  isPublished: true,
+  createdBy: 'admin-1',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  questions: [],
+};
+
+const examData = {
+  _id: 'exam-1',
+  name: 'Exam',
+  slug: 'exam',
+  category: 'general',
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+const attemptResponse = (id: string, resumed: boolean): StartAttemptResponse => ({
+  attempt: {
+    _id: id,
+    userId: 'user-1',
+    testId: 'test-1',
+    startTime: '2026-01-01T00:00:00.000Z',
+    totalScore: 0,
+    correctCount: 0,
+    incorrectCount: 0,
+    unattemptedCount: 10,
+    timeTakenSeconds: 0,
+    status: 'in_progress',
+    sectionResults: [],
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  questions: [],
+  resumed,
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => { resolve = res; });
+  return { promise, resolve };
+}
+
+async function renderTestDetails(root: Root, container: HTMLDivElement) {
+  await act(async () => {
+    root.render(<TestDetails testId="test-1" />);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  return container.querySelector('button[aria-busy]') as HTMLButtonElement | null;
+}
+
+describe('TestDetails attempt lifecycle', () => {
+  let root: Root | null = null;
+  let container: HTMLDivElement;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    push.mockReset();
+    vi.mocked(testsApi.get).mockResolvedValue(testData);
+    vi.mocked(examsApi.get).mockResolvedValue(examData);
+    vi.mocked(examsApi.listSections).mockResolvedValue([]);
+    vi.mocked(attemptsApi.start).mockReset();
+  });
+
+  afterEach(() => {
+    if (root) act(() => root?.unmount());
+    root = null;
+    container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('does not create an attempt while viewing test details', async () => {
+    root = createRoot(container);
+    await renderTestDetails(root, container);
+    expect(attemptsApi.start).not.toHaveBeenCalled();
+  });
+
+  it('creates an attempt only after an explicit click and disables the button while pending', async () => {
+    const request = deferred<StartAttemptResponse>();
+    vi.mocked(attemptsApi.start).mockReturnValue(request.promise);
+    root = createRoot(container);
+    const button = await renderTestDetails(root, container);
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button?.click();
+    });
+    expect(attemptsApi.start).toHaveBeenCalledTimes(1);
+    expect(button?.disabled).toBe(true);
+
+    await act(async () => {
+      button?.click();
+    });
+    expect(attemptsApi.start).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      request.resolve(attemptResponse('attempt-1', false));
+      await Promise.resolve();
+    });
+    expect(push).toHaveBeenCalledWith('/attempt/attempt-1');
+  });
+
+  it('uses the returned attempt id for a resumed attempt', async () => {
+    vi.mocked(attemptsApi.start).mockResolvedValue(attemptResponse('attempt-existing', true));
+    root = createRoot(container);
+    const button = await renderTestDetails(root, container);
+
+    await act(async () => {
+      button?.click();
+      await Promise.resolve();
+    });
+
+    expect(attemptsApi.start).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith('/attempt/attempt-existing');
+  });
+
+  it('renders a friendly start error and remains retryable', async () => {
+    vi.mocked(attemptsApi.start).mockRejectedValue(new ApiClientError(403, 'Forbidden', 'FORBIDDEN'));
+    root = createRoot(container);
+    const button = await renderTestDetails(root, container);
+
+    await act(async () => {
+      button?.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain('You are not authorized to start this test.');
+    expect(button?.disabled).toBe(false);
+  });
+});

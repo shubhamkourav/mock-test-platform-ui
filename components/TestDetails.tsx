@@ -6,6 +6,7 @@ import { Alert, Button, Card, CardContent, Chip, Divider, Grid, Stack, Typograph
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useRouter } from 'next/navigation';
+import { ApiClientError } from '../lib/api';
 import { attemptsApi } from '../lib/api/attempts';
 import { testsApi } from '../lib/api/tests';
 import { examsApi } from '../lib/api/exams';
@@ -13,6 +14,18 @@ import type { Exam, Section } from '../types/exam';
 import type { TestDetailResponse } from '../types/test';
 import { AppShell } from './AppShell';
 import { DiscoveryError, DiscoveryLoading } from './DiscoveryStates';
+
+function getStartErrorMessage(error: unknown) {
+  if (!(error instanceof ApiClientError)) return 'Unable to start the test. Please try again.';
+  if (error.status === 401) return 'Your session has expired. Please sign in again.';
+  if (error.status === 403) return 'You are not authorized to start this test.';
+  if (error.status === 404) return 'This published test is no longer available.';
+  if (error.status === 409) return error.code === 'ACTIVE_ATTEMPT_EXISTS'
+    ? 'An active attempt already exists. Please try again to resume it.'
+    : 'This test cannot be started right now.';
+  if (error.status === 400) return error.message || 'The test could not be started.';
+  return 'Unable to start the test. Please try again.';
+}
 
 export function TestDetails({ testId }: { testId: string }) {
   const router = useRouter();
@@ -54,7 +67,7 @@ export function TestDetails({ testId }: { testId: string }) {
       const response = await attemptsApi.start(testId);
       router.push(`/attempt/${response.attempt._id}`);
     } catch (err) {
-      setStartError(err instanceof Error ? err.message : 'Unable to start the test.');
+      setStartError(getStartErrorMessage(err));
       setStarting(false);
     }
   }
@@ -94,7 +107,7 @@ export function TestDetails({ testId }: { testId: string }) {
                   This is a timed test. Your answers will be saved as you progress, and the server controls the attempt deadline.
                 </Typography>
                 <Typography color="text.secondary">
-                  If you already have an active attempt, the server will resume it instead of creating another attempt.
+                  If you already have an active attempt, continuing will resume it instead of creating another attempt.
                 </Typography>
               </Stack>
 
@@ -115,8 +128,16 @@ export function TestDetails({ testId }: { testId: string }) {
               )}
 
               {startError && <Alert severity="error">{startError}</Alert>}
-              <Button variant="contained" size="large" startIcon={<PlayArrowIcon />} onClick={startOrResume} disabled={starting} sx={{ alignSelf: 'flex-start' }}>
-                {starting ? 'Preparing test...' : 'Start / Resume Test'}
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<PlayArrowIcon />}
+                onClick={startOrResume}
+                disabled={starting}
+                aria-busy={starting}
+                sx={{ alignSelf: 'flex-start' }}
+              >
+                {starting ? 'Preparing attempt...' : 'Start / Resume Test'}
               </Button>
             </Stack>
           </CardContent>
