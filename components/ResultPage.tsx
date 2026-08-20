@@ -208,10 +208,10 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
             <CardContent>
               <Stack spacing={2}>
                 <Typography variant="h6" fontWeight={800}>Section performance</Typography>
-                {result.sections.map((section) => (
-                  <Box key={section.sectionId} sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                {result.sections.map((section, index) => (
+                  <Box key={`section-${index + 1}`} sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
                     <Stack spacing={1}>
-                      <Typography fontWeight={700}>Section {section.sectionId}</Typography>
+                      <Typography fontWeight={700}>Section {index + 1}</Typography>
                       <Stack direction="row" spacing={1} flexWrap="wrap">
                         <Chip label={`Score: ${section.score}`} size="small" />
                         <Chip label={`Correct: ${section.correct}`} size="small" />
@@ -243,7 +243,6 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
                       <Chip label={`Score: ${topic.score}`} size="small" variant="outlined" />
                       <Chip label={`Correct: ${topic.correct}`} size="small" variant="outlined" />
                       <Chip label={`Incorrect: ${topic.incorrect}`} size="small" variant="outlined" />
-                      <Chip label={`Unattempted: ${Math.max(0, topic.attempted - topic.correct - topic.incorrect)}`} size="small" variant="outlined" />
                     </Stack>
                   </Box>
                 ))}
