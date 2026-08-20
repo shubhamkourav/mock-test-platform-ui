@@ -50,7 +50,7 @@ function readCachedQuestions(attemptId: string): AttemptQuestion[] | null {
 }
 
 export function AttemptPage({ attemptId }: { attemptId: string }) {
-  const router = useRouter();
+  const { push } = useRouter();
   const [attempt, setAttempt] = useState<ActiveAttempt | null>(null);
   const [questions, setQuestions] = useState<AttemptQuestion[]>([]);
   const [answers, setAnswers] = useState<Record<string, string[]>>({});
@@ -73,7 +73,7 @@ export function AttemptPage({ attemptId }: { attemptId: string }) {
     try {
       const attemptResponse = await attemptsApi.get(attemptId);
       if (attemptResponse.attempt.status !== 'in_progress') {
-        router.push(`/attempt/${attemptId}/result`);
+        push(`/attempt/${attemptId}/result`);
         return;
       }
 
@@ -104,7 +104,7 @@ export function AttemptPage({ attemptId }: { attemptId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [attemptId, router]);
+  }, [attemptId, push]);
 
   useEffect(() => { void loadAttempt(); }, [loadAttempt]);
 
@@ -197,12 +197,12 @@ export function AttemptPage({ attemptId }: { attemptId: string }) {
     try {
       await waitForPendingSaves();
       await attemptsApi.submit(attempt._id);
-      router.push(`/attempt/${attempt._id}/result`);
+      push(`/attempt/${attempt._id}/result`);
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 409 && err.code === 'ATTEMPT_EXPIRED') {
         try {
           await attemptsApi.result(attempt._id);
-          router.push(`/attempt/${attempt._id}/result`);
+          push(`/attempt/${attempt._id}/result`);
           return;
         } catch (resultError) {
           setSaveError(getSubmitErrorMessage(resultError));
