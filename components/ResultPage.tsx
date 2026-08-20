@@ -47,7 +47,7 @@ function optionPresentation(review: QuestionReview, optionKey: string) {
   const selected = review.selectedOptions.includes(optionKey);
   const correct = review.correctOptions.includes(optionKey);
   if (selected && correct) return { label: 'Selected and correct', color: 'success' as const };
-  if (selected) return { label: 'Selected answer', color: 'error' as const };
+  if (selected && !correct) return { label: 'Selected but incorrect', color: 'error' as const };
   if (correct) return { label: 'Correct answer', color: 'success' as const };
   return { label: '', color: 'default' as const };
 }
@@ -213,6 +213,7 @@ export function ResultPage({ attemptId }: { attemptId: string }) {
                     <Stack spacing={1}>
                       <Typography fontWeight={700}>Section {index + 1}</Typography>
                       <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Chip label={`Section ID: ${section.sectionId}`} size="small" variant="outlined" />
                         <Chip label={`Score: ${section.score}`} size="small" />
                         <Chip label={`Correct: ${section.correct}`} size="small" />
                         <Chip label={`Incorrect: ${section.incorrect}`} size="small" />
