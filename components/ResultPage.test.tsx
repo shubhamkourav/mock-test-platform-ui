@@ -9,9 +9,7 @@ import type { AttemptResult } from '../types/attempt';
 
 vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren) => <>{children}</> }));
 vi.mock('./DiscoveryStates', () => ({ DiscoveryLoading: () => <div>Loading result</div> }));
-vi.mock('../lib/api/attempts', () => ({
-  attemptsApi: { result: vi.fn(), start: vi.fn() },
-}));
+vi.mock('../lib/api/attempts', () => ({ attemptsApi: { result: vi.fn(), start: vi.fn() } }));
 
 const baseAttempt = {
   _id: 'attempt-1', userId: 'user-1', testId: 'test-1', startTime: '2026-01-01T00:00:00.000Z',
@@ -100,7 +98,7 @@ describe('ResultPage', () => {
     expect(container.textContent).toContain('Incorrect1');
     expect(container.textContent).toContain('Unattempted1');
     expect(container.textContent).toContain('30m 0s');
-    expect(container.textContent).toContain('Section section-1');
+    expect(container.textContent).toContain('Section 1');
     expect(container.textContent).toContain('Arithmetic');
   });
 
