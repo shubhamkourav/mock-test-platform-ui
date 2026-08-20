@@ -78,12 +78,13 @@ describe('AttemptPage test-taking experience', () => {
     const dialogSubmit = () => Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === 'Submit Test' && item.closest('[role="dialog"]')) as HTMLButtonElement | undefined;
     await vi.waitFor(() => expect(dialogSubmit()).toBeTruthy());
 
-    await act(async () => { dialogSubmit()!.click(); });
+    const confirmSubmitButton = dialogSubmit();
+    expect(confirmSubmitButton).toBeTruthy();
+    await act(async () => { confirmSubmitButton!.click(); });
     await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledTimes(1));
 
-    const pendingDialogSubmit = dialogSubmit();
-    expect(pendingDialogSubmit?.disabled).toBe(true);
-    await act(async () => { pendingDialogSubmit?.click(); });
+    expect(confirmSubmitButton!.disabled).toBe(true);
+    await act(async () => { confirmSubmitButton!.click(); });
     expect(attemptsApi.submit).toHaveBeenCalledTimes(1);
 
     await act(async () => { resolveSubmit(attempt); });
@@ -98,7 +99,9 @@ describe('AttemptPage test-taking experience', () => {
     await act(async () => { button(container, 'Submit Test').click(); });
     const dialogSubmit = () => Array.from(document.body.querySelectorAll('button')).find((item) => item.textContent?.trim() === 'Submit Test' && item.closest('[role="dialog"]')) as HTMLButtonElement | undefined;
     await vi.waitFor(() => expect(dialogSubmit()).toBeTruthy());
-    await act(async () => { dialogSubmit()!.click(); });
+    const confirmSubmitButton = dialogSubmit();
+    expect(confirmSubmitButton).toBeTruthy();
+    await act(async () => { confirmSubmitButton!.click(); });
 
     await vi.waitFor(() => expect(attemptsApi.submit).toHaveBeenCalledWith('attempt-1'));
     await vi.waitFor(() => expect(attemptsApi.result).toHaveBeenCalledWith('attempt-1'));
