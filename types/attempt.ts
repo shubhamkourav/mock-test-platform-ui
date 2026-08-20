@@ -86,6 +86,7 @@ export interface QuestionReview {
   questionId: string;
   questionText: string;
   options: Array<{ key: string; text: string }>;
+  selectionMode: SelectionMode;
   selectedOptions: string[];
   correctOptions: string[];
   isAttempted: boolean;
