@@ -37,10 +37,13 @@ export interface Attempt {
   updatedAt: string;
 }
 
+export type SelectionMode = 'single' | 'multiple';
+
 export interface AttemptQuestion {
   questionId: string;
   questionText: string;
   options: Array<{ key: string; text: string }>;
+  selectionMode: SelectionMode;
   subjectTag: string;
   topic: string;
   difficulty: 'easy' | 'medium' | 'hard';
