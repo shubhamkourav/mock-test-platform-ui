@@ -13,6 +13,16 @@ vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren)
 vi.mock('../lib/api/attempts', () => ({ attemptsApi: { get: vi.fn(), start: vi.fn(), saveAnswer: vi.fn(), submit: vi.fn(), result: vi.fn() } }));
 vi.mock('../lib/api/tests', () => ({ testsApi: { get: vi.fn() } }));
 
+// AttemptPage behavior tests should not run a live interval. The timer's real
+// lifecycle/countdown behavior is covered by hooks/useAttemptTimer.test.tsx.
+vi.mock('../hooks/useAttemptTimer', async () => {
+  const actual = await vi.importActual<typeof import('../hooks/useAttemptTimer')>('../hooks/useAttemptTimer');
+  return {
+    ...actual,
+    useAttemptTimer: vi.fn(() => ({ remainingSeconds: 1_800, expired: false })),
+  };
+});
+
 const attempt = { _id: 'attempt-1', userId: 'user-1', testId: 'test-1', startTime: new Date(Date.now() - 30_000).toISOString(), totalScore: 0, correctCount: 0, incorrectCount: 0, unattemptedCount: 2, timeTakenSeconds: 0, status: 'in_progress' as const, sectionResults: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
 const questions = [
   { questionId: 'q1', questionText: 'Choose one', options: [{ key: 'a', text: 'A' }, { key: 'b', text: 'B' }], selectionMode: 'single' as const, subjectTag: 'Math', topic: 'Algebra', difficulty: 'easy' as const, sectionId: 's1', order: 1, marks: 1 },
