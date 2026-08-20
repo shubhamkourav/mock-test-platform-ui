@@ -133,9 +133,16 @@ describe('ResultPage', () => {
     root = createRoot(container);
     await renderResult(root, resultFixture);
     expect(container.textContent).toContain('Selected and correct');
+
+    const incorrectQuestion = container.querySelector('button[aria-label="Review question 2"]') as HTMLButtonElement;
+    await act(async () => { incorrectQuestion.click(); });
+    expect(container.textContent).toContain('Selected but incorrect');
+
+    const unattemptedQuestion = container.querySelector('button[aria-label="Review question 3"]') as HTMLButtonElement;
+    await act(async () => { unattemptedQuestion.click(); });
     expect(container.textContent).toContain('Correct answer');
-    expect(container.textContent).toContain('Explanation');
     expect(container.textContent).toContain('Unattempted');
+
     const inputs = Array.from(container.querySelectorAll('input'));
     expect(inputs.length).toBeGreaterThan(0);
     expect(inputs.every((input) => input.disabled)).toBe(true);
