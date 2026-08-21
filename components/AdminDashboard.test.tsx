@@ -10,12 +10,7 @@ vi.mock('next/link', () => ({
 }));
 vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren) => <>{children}</> }));
 vi.mock('../lib/api/exams', () => ({
-  examsApi: {
-    list: vi.fn(),
-    get: vi.fn(),
-    create: vi.fn(),
-    update: vi.fn(),
-  },
+  examsApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn() },
 }));
 
 const exam = {
@@ -37,6 +32,7 @@ afterEach(() => {
   act(() => root?.unmount());
   host?.remove();
   vi.clearAllMocks();
+  vi.restoreAllMocks();
 });
 
 async function render() {
@@ -52,19 +48,16 @@ describe('AdminDashboard', () => {
     expect(host?.textContent).toContain('Details & sections');
   });
 
-  it('opens the create form and creates an exam', async () => {
+  it('opens the create form without making an automatic mutation', async () => {
     await render();
     const createButton = Array.from(host?.querySelectorAll('button') ?? []).find((button) => button.textContent === 'Create exam') as HTMLButtonElement;
     expect(createButton).toBeTruthy();
     await act(async () => { createButton.click(); });
     expect(host?.textContent).toContain('Create exam');
-
-    const inputs = Array.from(host?.querySelectorAll('input'));
-    const nameInput = inputs.find((input) => input.getAttribute('name') === '');
-    expect(nameInput).toBeTruthy();
+    expect(examsApi.create).not.toHaveBeenCalled();
   });
 
-  it('uses the update endpoint for activation changes', async () => {
+  it('uses the update endpoint for deactivation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(examsApi.update).mockResolvedValue({ ...exam, isActive: false });
     await render();
