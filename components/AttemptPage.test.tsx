@@ -108,6 +108,23 @@ describe('AttemptPage test-taking experience', () => {
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/attempt/attempt-1/result'));
   });
   it('handles 404 and 403 loading errors', async () => { vi.mocked(attemptsApi.get).mockRejectedValueOnce(new ApiClientError(404, 'Not found')); root = createRoot(container); await renderPage(root); await flush(); expect(container.textContent).toContain('could not be found'); root.unmount(); root = createRoot(container); vi.mocked(attemptsApi.get).mockRejectedValueOnce(new ApiClientError(403, 'Forbidden')); await renderPage(root); await flush(); expect(container.textContent).toContain('not authorized'); });
-  it('shows an explicit recovery state when direct navigation has no cached questions', async () => { window.sessionStorage.clear(); root = createRoot(container); await renderPage(root); await flush(); expect(container.textContent).toContain('Question data is not available'); expect(attemptsApi.start).not.toHaveBeenCalled(); });
+  it('shows an actionable recovery state when direct navigation has no cached questions', async () => {
+    window.sessionStorage.clear();
+    root = createRoot(container);
+    await renderPage(root);
+    await flush();
+    expect(container.textContent).toContain('Question data is not available');
+    expect(container.textContent).toContain('Return to Test Details');
+    expect(attemptsApi.start).not.toHaveBeenCalled();
+  });
+  it('returns to the existing test details route using the attempt test id without starting another attempt', async () => {
+    window.sessionStorage.clear();
+    root = createRoot(container);
+    await renderPage(root);
+    await flush();
+    await act(async () => { button(container, 'Return to Test Details').click(); });
+    expect(push).toHaveBeenCalledWith('/tests/test-1');
+    expect(attemptsApi.start).not.toHaveBeenCalled();
+  });
   it('does not render answer-key or scoring fields', async () => { root = createRoot(container); await renderPage(root); await flush(); expect(container.textContent).not.toContain('correctOptions'); expect(container.textContent).not.toContain('isCorrect'); expect(container.textContent).not.toContain('marksObtained'); expect(container.textContent).not.toContain('questionSnapshot'); expect(container.textContent).not.toContain('score'); });
 });

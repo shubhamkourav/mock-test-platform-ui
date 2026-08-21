@@ -16,6 +16,7 @@ import type { Attempt, AttemptAnswer, AttemptQuestion } from '../types/attempt';
 type ActiveAttempt = Pick<Attempt, '_id' | 'testId' | 'startTime' | 'status'>;
 type SavePayload = Parameters<typeof attemptsApi.saveAnswer>[1];
 const QUESTION_CACHE_PREFIX = 'mock-test-attempt-questions:';
+const QUESTION_CACHE_RECOVERY_MESSAGE = 'Question data is not available for this attempt. Return to the test details page and choose Start / Resume Test again.';
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (!(error instanceof ApiClientError)) return fallback;
@@ -77,22 +78,23 @@ export function AttemptPage({ attemptId }: { attemptId: string }) {
         return;
       }
 
-      const test = await testsApi.get(attemptResponse.attempt.testId);
-      const restoredQuestions = readCachedQuestions(attemptId);
-      if (!restoredQuestions?.length) {
-        throw new Error('Question data is not available for this attempt. Return to the test details page and choose Start / Resume Test again.');
-      }
-
       const safeAttempt: ActiveAttempt = {
         _id: attemptResponse.attempt._id,
         testId: attemptResponse.attempt.testId,
         startTime: attemptResponse.attempt.startTime,
         status: attemptResponse.attempt.status,
       };
+      setAttempt(safeAttempt);
+
+      const test = await testsApi.get(attemptResponse.attempt.testId);
+      const restoredQuestions = readCachedQuestions(attemptId);
+      if (!restoredQuestions?.length) {
+        throw new Error(QUESTION_CACHE_RECOVERY_MESSAGE);
+      }
+
       const restoredAnswers = Object.fromEntries(attemptResponse.answers.map((answer: AttemptAnswer) => [answer.questionId, answer.selectedOptions]));
       const restoredReview = Object.fromEntries(attemptResponse.answers.map((answer: AttemptAnswer) => [answer.questionId, answer.markedForReview]));
 
-      setAttempt(safeAttempt);
       setQuestions(restoredQuestions);
       setAnswers(restoredAnswers);
       setMarkedForReview(restoredReview);
@@ -217,7 +219,7 @@ export function AttemptPage({ attemptId }: { attemptId: string }) {
   }
 
   if (loading) return <AppShell><Typography>Loading attempt...</Typography></AppShell>;
-  if (error) return <AppShell><Stack spacing={2}><Alert severity="error">{error}</Alert><Button variant="outlined" onClick={() => void loadAttempt()}>Retry</Button></Stack></AppShell>;
+  if (error) return <AppShell><Stack spacing={2}><Alert severity="error">{error}</Alert>{error === QUESTION_CACHE_RECOVERY_MESSAGE && attempt && <Button variant="outlined" onClick={() => push(`/tests/${attempt.testId}`)}>Return to Test Details</Button>}<Button variant="outlined" onClick={() => void loadAttempt()}>Retry</Button></Stack></AppShell>;
   if (!attempt || !question) return <AppShell><Alert severity="error">No active attempt questions are available.</Alert></AppShell>;
 
   return (
