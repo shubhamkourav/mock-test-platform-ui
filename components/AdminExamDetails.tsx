@@ -38,8 +38,21 @@ function apiErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unable to complete the request.';
 }
 
+type SectionFormValues = {
+  stage: string;
+  name: string;
+  slug: string;
+  subjectTag: string;
+  questionCount: number;
+  timeMinutes: number;
+  maxMarks: number;
+  negativeMarking: number;
+  order: number;
+  isActive: boolean;
+};
+
 function SectionForm({ examId, section, onSaved, onClose }: { examId: string; section: Section | null; onSaved: (value: Section) => void; onClose: () => void }) {
-  const [form, setForm] = useState<CreateSectionInput>({
+  const [form, setForm] = useState<SectionFormValues>({
     stage: section?.stage ?? 'prelims', name: section?.name ?? '', slug: section?.slug ?? '', subjectTag: section?.subjectTag ?? '',
     questionCount: section?.questionCount ?? 1, timeMinutes: section?.timeMinutes ?? 1, maxMarks: section?.maxMarks ?? 0,
     negativeMarking: section?.negativeMarking ?? 0, order: section?.order ?? 1, isActive: section?.isActive ?? true,
@@ -47,7 +60,7 @@ function SectionForm({ examId, section, onSaved, onClose }: { examId: string; se
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  function update<K extends keyof CreateSectionInput>(field: K, value: CreateSectionInput[K]) { setForm((current) => ({ ...current, [field]: value })); }
+  function update<K extends keyof SectionFormValues>(field: K, value: SectionFormValues[K]) { setForm((current) => ({ ...current, [field]: value })); }
 
   function validate() {
     if (!form.name.trim() || !form.slug.trim() || !form.subjectTag.trim()) { setError('Name, slug, and subject tag are required.'); return false; }
@@ -61,8 +74,9 @@ function SectionForm({ examId, section, onSaved, onClose }: { examId: string; se
   async function save() {
     if (!validate()) return;
     setSaving(true); setError('');
+    const payload: CreateSectionInput = form;
     try {
-      const saved = section ? await examsApi.updateSection(section._id, form as UpdateSectionInput) : await examsApi.createSection(examId, form);
+      const saved = section ? await examsApi.updateSection(section._id, payload as UpdateSectionInput) : await examsApi.createSection(examId, payload);
       onSaved(saved); onClose();
     } catch (err) { setError(apiErrorMessage(err)); }
     finally { setSaving(false); }
