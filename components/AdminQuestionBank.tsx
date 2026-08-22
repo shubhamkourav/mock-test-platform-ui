@@ -2,68 +2,39 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  Button,
-  Card,
-  CardContent,
-  Checkbox,
-  Chip,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  FormControl,
-  FormControlLabel,
-  Grid,
-  InputLabel,
-  MenuItem,
-  Pagination,
-  Select,
-  Stack,
-  TextField,
-  Typography,
+  Alert, Button, Card, CardContent, Checkbox, Chip, Dialog, DialogActions, DialogContent,
+  DialogTitle, FormControl, FormControlLabel, Grid, InputLabel, MenuItem, Pagination,
+  Select, Stack, TextField, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { ApiClientError } from '../lib/api';
 import { questionsApi } from '../lib/api/questions';
 import { examsApi } from '../lib/api/exams';
 import type { Exam, Section } from '../types/exam';
 import type {
-  AdminQuestion,
-  CreateQuestionInput,
-  QuestionFilters,
-  QuestionListResponse,
-  QuestionOption,
-  QuestionSelectionMode,
-  StudentQuestion,
-  UpdateQuestionInput,
+  AdminQuestion, CreateQuestionInput, QuestionFilters, QuestionListResponse, QuestionOption,
+  QuestionSelectionMode, StudentQuestion, UpdateQuestionInput,
 } from '../types/question';
 import { AppShell } from './AppShell';
 
-type QuestionFormState = {
-  examId: string;
-  sectionId: string;
-  subjectTag: string;
-  topic: string;
-  questionText: string;
-  options: QuestionOption[];
-  correctOptions: string[];
-  selectionMode: QuestionSelectionMode;
-  explanation: string;
-  defaultMarks: number;
-  negativeMarks: number;
-  difficulty: 'easy' | 'medium' | 'hard';
-  isActive: boolean;
+type Difficulty = 'easy' | 'medium' | 'hard';
+type FormState = {
+  examId: string; sectionId: string; subjectTag: string; topic: string; questionText: string;
+  options: QuestionOption[]; correctOptions: string[]; selectionMode: QuestionSelectionMode;
+  explanation: string; defaultMarks: number; negativeMarks: number; difficulty: Difficulty; isActive: boolean;
 };
 
-const emptyForm: QuestionFormState = {
+const emptyForm: FormState = {
   examId: '', sectionId: '', subjectTag: '', topic: '', questionText: '',
   options: [{ key: 'A', text: '' }, { key: 'B', text: '' }], correctOptions: [],
   selectionMode: 'single', explanation: '', defaultMarks: 1, negativeMarks: 0,
   difficulty: 'medium', isActive: true,
 };
+
+function selectionModeFrom(value: string): QuestionSelectionMode { return value === 'multiple' ? 'multiple' : 'single'; }
+function difficultyFrom(value: string): Difficulty { return value === 'easy' || value === 'hard' ? value : 'medium'; }
 
 function errorMessage(error: unknown) {
   if (error instanceof ApiClientError) {
@@ -83,7 +54,7 @@ function nextOptionKey(options: QuestionOption[]) {
   return `O${options.length + 1}`;
 }
 
-function validateForm(form: QuestionFormState) {
+function validateForm(form: FormState, requireAnswerKey: boolean) {
   if (!form.examId) return 'Exam is required.';
   if (!form.sectionId) return 'Section is required.';
   if (!form.subjectTag.trim() || !form.topic.trim() || !form.questionText.trim()) return 'Subject, topic, and question text are required.';
@@ -91,266 +62,192 @@ function validateForm(form: QuestionFormState) {
   if (form.options.some(option => !option.key.trim() || !option.text.trim())) return 'Every option needs a key and text.';
   const keys = form.options.map(option => option.key.trim());
   if (new Set(keys).size !== keys.length) return 'Option keys must be unique.';
-  if (form.correctOptions.length === 0) return 'Select at least one correct option.';
-  if (form.correctOptions.some(key => !keys.includes(key))) return 'Correct options must reference existing option keys.';
-  if (form.selectionMode === 'single' && form.correctOptions.length !== 1) return 'Single-selection questions require exactly one correct option.';
+  if (requireAnswerKey) {
+    if (form.correctOptions.length === 0) return 'Select at least one correct option.';
+    if (form.correctOptions.some(key => !keys.includes(key))) return 'Correct options must reference existing option keys.';
+    if (form.selectionMode === 'single' && form.correctOptions.length !== 1) return 'Single-selection questions require exactly one correct option.';
+  }
   if (form.defaultMarks < 0 || form.negativeMarks < 0) return 'Marks cannot be negative.';
   return '';
 }
 
-function QuestionForm({ question, exams, sections, onSaved, onClose }: { question: AdminQuestion | StudentQuestion | null; exams: Exam[]; sections: Section[]; onSaved: (value: AdminQuestion) => void; onClose: () => void }) {
-  const initial = useMemo<QuestionFormState>(() => {
+function QuestionForm({ question, exams, sections, onSaved, onClose }: {
+  question: AdminQuestion | StudentQuestion | null; exams: Exam[]; sections: Section[];
+  onSaved: (value: AdminQuestion) => void; onClose: () => void;
+}) {
+  const initial = useMemo<FormState>(() => {
     if (!question) return emptyForm;
-    const examId = sections.find(section => section._id === question.sectionId)?.examId ?? '';
     return {
-      examId,
-      sectionId: question.sectionId,
-      subjectTag: question.subjectTag,
-      topic: question.topic,
-      questionText: question.questionText,
-      options: question.options.map(option => ({ ...option })),
+      examId: sections.find(section => section._id === question.sectionId)?.examId ?? '',
+      sectionId: question.sectionId, subjectTag: question.subjectTag, topic: question.topic,
+      questionText: question.questionText, options: question.options.map(option => ({ ...option })),
       correctOptions: 'correctOptions' in question ? [...question.correctOptions] : [],
-      selectionMode: question.selectionMode,
-      explanation: question.explanation ?? '',
-      defaultMarks: question.defaultMarks,
-      negativeMarks: question.negativeMarks,
-      difficulty: question.difficulty,
-      isActive: question.isActive,
+      selectionMode: question.selectionMode, explanation: question.explanation ?? '',
+      defaultMarks: question.defaultMarks, negativeMarks: question.negativeMarks,
+      difficulty: question.difficulty, isActive: question.isActive,
     };
   }, [question, sections]);
-  const [form, setForm] = useState<QuestionFormState>(initial);
+  const [form, setForm] = useState<FormState>(initial);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-
   useEffect(() => setForm(initial), [initial]);
 
   const availableSections = sections.filter(section => !form.examId || section.examId === form.examId);
+  const hasAnswerKey = !question || 'correctOptions' in question;
 
-  function update<K extends keyof QuestionFormState>(field: K, value: QuestionFormState[K]) {
-    setForm(current => ({ ...current, [field]: value }));
-    setError('');
+  function update<K extends keyof FormState>(field: K, value: FormState[K]) {
+    setForm(current => ({ ...current, [field]: value })); setError('');
   }
-
   function updateOption(index: number, field: keyof QuestionOption, value: string) {
-    setForm(current => ({ ...current, options: current.options.map((option, optionIndex) => optionIndex === index ? { ...option, [field]: value } : option) }));
-    setError('');
+    setForm(current => ({ ...current, options: current.options.map((option, i) => i === index ? { ...option, [field]: value } : option) })); setError('');
   }
-
   function toggleCorrect(key: string) {
-    setForm(current => {
-      if (current.selectionMode === 'single') return { ...current, correctOptions: [key] };
-      return { ...current, correctOptions: current.correctOptions.includes(key) ? current.correctOptions.filter(item => item !== key) : [...current.correctOptions, key] };
-    });
+    setForm(current => current.selectionMode === 'single'
+      ? { ...current, correctOptions: [key] }
+      : { ...current, correctOptions: current.correctOptions.includes(key) ? current.correctOptions.filter(item => item !== key) : [...current.correctOptions, key] });
   }
-
   function addOption() {
-    if (form.options.length >= 10) return;
-    update('options', [...form.options, { key: nextOptionKey(form.options), text: '' }]);
+    if (form.options.length < 10) update('options', [...form.options, { key: nextOptionKey(form.options), text: '' }]);
   }
-
   function removeOption(index: number) {
     if (form.options.length <= 2) return;
     const removed = form.options[index];
-    update('options', form.options.filter((_, optionIndex) => optionIndex !== index));
+    update('options', form.options.filter((_, i) => i !== index));
     setForm(current => ({ ...current, correctOptions: current.correctOptions.filter(key => key !== removed.key) }));
   }
 
   async function save() {
-    const validationError = validateForm(form);
+    const validationError = validateForm(form, hasAnswerKey);
     if (validationError) { setError(validationError); return; }
     setSaving(true); setError('');
-    const payload: CreateQuestionInput = {
-      examId: form.examId,
-      sectionId: form.sectionId,
-      subjectTag: form.subjectTag.trim(),
-      topic: form.topic.trim(),
-      questionText: form.questionText.trim(),
-      options: form.options.map(option => ({ key: option.key.trim(), text: option.text.trim() })),
-      correctOptions: form.correctOptions,
-      selectionMode: form.selectionMode,
-      explanation: form.explanation.trim() || undefined,
-      defaultMarks: form.defaultMarks,
-      negativeMarks: form.negativeMarks,
-      difficulty: form.difficulty,
-      isActive: form.isActive,
+    const base: UpdateQuestionInput = {
+      examId: form.examId, sectionId: form.sectionId, subjectTag: form.subjectTag.trim(), topic: form.topic.trim(),
+      questionText: form.questionText.trim(), options: form.options.map(option => ({ key: option.key.trim(), text: option.text.trim() })),
+      selectionMode: form.selectionMode, explanation: form.explanation.trim() || undefined,
+      defaultMarks: form.defaultMarks, negativeMarks: form.negativeMarks, difficulty: form.difficulty, isActive: form.isActive,
     };
+    if (hasAnswerKey) base.correctOptions = form.correctOptions;
     try {
-      const saved = question
-        ? await questionsApi.update(question._id, payload as UpdateQuestionInput)
-        : await questionsApi.create(payload);
-      onSaved(saved);
-      onClose();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSaving(false);
-    }
+      const saved = question ? await questionsApi.update(question._id, base) : await questionsApi.create({ ...base, correctOptions: form.correctOptions });
+      onSaved(saved); onClose();
+    } catch (err) { setError(errorMessage(err)); } finally { setSaving(false); }
   }
 
   return <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="md">
     <DialogTitle>{question ? 'Edit question' : 'Create question'}</DialogTitle>
-    <DialogContent>
-      <Stack spacing={2} sx={{ pt: 1 }}>
-        {error && <Alert severity="error">{error}</Alert>}
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}><FormControl fullWidth required><InputLabel>Exam</InputLabel><Select label="Exam" value={form.examId} onChange={event => update('examId', event.target.value)}>{exams.map(exam => <MenuItem key={exam._id} value={exam._id}>{exam.name}</MenuItem>)}</Select></FormControl></Grid>
-          <Grid size={{ xs: 12, sm: 6 }}><FormControl fullWidth required><InputLabel>Section</InputLabel><Select label="Section" value={form.sectionId} onChange={event => update('sectionId', event.target.value)}>{availableSections.map(section => <MenuItem key={section._id} value={section._id}>{section.name} ({section.subjectTag})</MenuItem>)}</Select></FormControl></Grid>
-          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Subject" value={form.subjectTag} onChange={event => update('subjectTag', event.target.value)} required /></Grid>
-          <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Topic" value={form.topic} onChange={event => update('topic', event.target.value)} required /></Grid>
-          <Grid size={12}><TextField fullWidth label="Question text" value={form.questionText} onChange={event => update('questionText', event.target.value)} multiline minRows={3} required /></Grid>
-          <Grid size={{ xs: 12, sm: 4 }}><FormControl fullWidth><InputLabel>Selection mode</InputLabel><Select label="Selection mode" value={form.selectionMode} onChange={event => update('selectionMode', event.target.value as QuestionSelectionMode)}><MenuItem value="single">Single choice</MenuItem><MenuItem value="multiple">Multiple choice</MenuItem></Select></FormControl></Grid>
-          <Grid size={{ xs: 12, sm: 4 }}><FormControl fullWidth><InputLabel>Difficulty</InputLabel><Select label="Difficulty" value={form.difficulty} onChange={event => update('difficulty', event.target.value as QuestionFormState['difficulty'])}><MenuItem value="easy">Easy</MenuItem><MenuItem value="medium">Medium</MenuItem><MenuItem value="hard">Hard</MenuItem></Select></FormControl></Grid>
-          <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Marks" value={form.defaultMarks} onChange={event => update('defaultMarks', Number(event.target.value))} /></Grid>
-          <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Negative marks" value={form.negativeMarks} onChange={event => update('negativeMarks', Number(event.target.value))} /></Grid>
-        </Grid>
-        <Stack spacing={1}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Options</Typography><Button onClick={addOption} disabled={form.options.length >= 10}>Add option</Button></Stack>
-          {form.options.map((option, index) => <Stack key={`${index}-${option.key}`} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
-            <TextField label="Key" value={option.key} onChange={event => updateOption(index, 'key', event.target.value)} sx={{ width: { sm: 100 } }} />
-            <TextField fullWidth label={`Option ${index + 1}`} value={option.text} onChange={event => updateOption(index, 'text', event.target.value)} />
-            <FormControlLabel control={<Checkbox checked={form.correctOptions.includes(option.key)} onChange={() => toggleCorrect(option.key)} />} label="Correct" />
-            <Button color="error" onClick={() => removeOption(index)} disabled={form.options.length <= 2}>Remove</Button>
-          </Stack>)}
-        </Stack>
-        <TextField label="Explanation" value={form.explanation} onChange={event => update('explanation', event.target.value)} multiline minRows={3} fullWidth />
-        <FormControlLabel control={<Checkbox checked={form.isActive} onChange={event => update('isActive', event.target.checked)} />} label="Active question" />
-        {question && !('correctOptions' in question) && <Alert severity="warning">The authorized answer key could not be loaded. Existing correct answers are preserved by the API when they are not included in an update.</Alert>}
+    <DialogContent><Stack spacing={2} sx={{ pt: 1 }}>
+      {error && <Alert severity="error">{error}</Alert>}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6 }}><FormControl fullWidth required><InputLabel>Exam</InputLabel><Select label="Exam" value={form.examId} onChange={event => update('examId', event.target.value)}>{exams.map(exam => <MenuItem key={exam._id} value={exam._id}>{exam.name}</MenuItem>)}</Select></FormControl></Grid>
+        <Grid size={{ xs: 12, sm: 6 }}><FormControl fullWidth required><InputLabel>Section</InputLabel><Select label="Section" value={form.sectionId} onChange={event => update('sectionId', event.target.value)}>{availableSections.map(section => <MenuItem key={section._id} value={section._id}>{section.name} ({section.subjectTag})</MenuItem>)}</Select></FormControl></Grid>
+        <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Subject" value={form.subjectTag} onChange={event => update('subjectTag', event.target.value)} required /></Grid>
+        <Grid size={{ xs: 12, sm: 6 }}><TextField fullWidth label="Topic" value={form.topic} onChange={event => update('topic', event.target.value)} required /></Grid>
+        <Grid size={12}><TextField fullWidth label="Question text" value={form.questionText} onChange={event => update('questionText', event.target.value)} multiline minRows={3} required /></Grid>
+        <Grid size={{ xs: 12, sm: 4 }}><FormControl fullWidth><InputLabel>Selection mode</InputLabel><Select label="Selection mode" value={form.selectionMode} onChange={event => update('selectionMode', selectionModeFrom(event.target.value))}><MenuItem value="single">Single choice</MenuItem><MenuItem value="multiple">Multiple choice</MenuItem></Select></FormControl></Grid>
+        <Grid size={{ xs: 12, sm: 4 }}><FormControl fullWidth><InputLabel>Difficulty</InputLabel><Select label="Difficulty" value={form.difficulty} onChange={event => update('difficulty', difficultyFrom(event.target.value))}><MenuItem value="easy">Easy</MenuItem><MenuItem value="medium">Medium</MenuItem><MenuItem value="hard">Hard</MenuItem></Select></FormControl></Grid>
+        <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Marks" value={form.defaultMarks} onChange={event => update('defaultMarks', Number(event.target.value))} /></Grid>
+        <Grid size={{ xs: 6, sm: 2 }}><TextField fullWidth type="number" label="Negative marks" value={form.negativeMarks} onChange={event => update('negativeMarks', Number(event.target.value))} /></Grid>
+      </Grid>
+      <Stack spacing={1}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center"><Typography variant="h6">Options</Typography><Button onClick={addOption} disabled={form.options.length >= 10}>Add option</Button></Stack>
+        {form.options.map((option, index) => <Stack key={`${index}-${option.key}`} direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+          <TextField label="Key" value={option.key} onChange={event => updateOption(index, 'key', event.target.value)} sx={{ width: { sm: 100 } }} />
+          <TextField fullWidth label={`Option ${index + 1}`} value={option.text} onChange={event => updateOption(index, 'text', event.target.value)} />
+          <FormControlLabel control={<Checkbox checked={form.correctOptions.includes(option.key)} onChange={() => toggleCorrect(option.key)} disabled={!hasAnswerKey} />} label="Correct" />
+          <Button color="error" onClick={() => removeOption(index)} disabled={form.options.length <= 2}>Remove</Button>
+        </Stack>)}
       </Stack>
-    </DialogContent>
+      <TextField label="Explanation" value={form.explanation} onChange={event => update('explanation', event.target.value)} multiline minRows={3} fullWidth />
+      <FormControlLabel control={<Checkbox checked={form.isActive} onChange={event => update('isActive', event.target.checked)} />} label="Active question" />
+      {!hasAnswerKey && <Alert severity="warning">The active question detail did not provide an admin answer key. Existing correct answers will be preserved by the API when they are omitted from this update.</Alert>}
+    </Stack></DialogContent>
     <DialogActions><Button onClick={onClose} disabled={saving}>Cancel</Button><Button variant="contained" onClick={() => void save()} disabled={saving}>{saving ? 'Saving...' : 'Save question'}</Button></DialogActions>
   </Dialog>;
 }
 
 function PreviewDialog({ question, onClose }: { question: AdminQuestion; onClose: () => void }) {
-  return <Dialog open onClose={onClose} fullWidth maxWidth="md">
-    <DialogTitle>Question preview</DialogTitle>
-    <DialogContent>
-      <Stack spacing={2}>
-        <Stack direction="row" spacing={1} flexWrap="wrap"><Chip label={question.selectionMode === 'single' ? 'Single choice' : 'Multiple choice'} /><Chip label={question.difficulty} /><Chip label={question.isActive ? 'Active' : 'Inactive'} color={question.isActive ? 'success' : 'default'} /></Stack>
-        <Typography variant="h6">{question.questionText}</Typography>
-        <Stack spacing={1}>{question.options.map(option => <Card key={option.key} variant="outlined"><CardContent><Stack direction="row" spacing={1} alignItems="center"><Typography fontWeight={700}>{option.key}</Typography><Typography>{option.text}</Typography>{question.correctOptions.includes(option.key) && <Chip size="small" label="Correct answer" color="success" />}</Stack></CardContent></Card>)}</Stack>
-        {question.explanation && <Alert severity="info"><strong>Explanation:</strong> {question.explanation}</Alert>}
-      </Stack>
-    </DialogContent>
-    <DialogActions><Button onClick={onClose}>Close</Button></DialogActions>
-  </Dialog>;
+  return <Dialog open onClose={onClose} fullWidth maxWidth="md"><DialogTitle>Question preview</DialogTitle><DialogContent><Stack spacing={2}>
+    <Stack direction="row" spacing={1} flexWrap="wrap"><Chip label={question.selectionMode === 'single' ? 'Single choice' : 'Multiple choice'} /><Chip label={question.difficulty} /><Chip label={question.isActive ? 'Active' : 'Inactive'} color={question.isActive ? 'success' : 'default'} /></Stack>
+    <Typography variant="h6">{question.questionText}</Typography>
+    <Stack spacing={1}>{question.options.map(option => <Card key={option.key} variant="outlined"><CardContent><Stack direction="row" spacing={1} alignItems="center"><Typography fontWeight={700}>{option.key}</Typography><Typography>{option.text}</Typography>{question.correctOptions.includes(option.key) && <Chip size="small" label="Correct answer" color="success" />}</Stack></CardContent></Card>)}</Stack>
+    {question.explanation && <Alert severity="info"><strong>Explanation:</strong> {question.explanation}</Alert>}
+  </Stack></DialogContent><DialogActions><Button onClick={onClose}>Close</Button></DialogActions></Dialog>;
 }
 
 export function AdminQuestionBank() {
   const [result, setResult] = useState<QuestionListResponse>({ items: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [exams, setExams] = useState<Exam[]>([]); const [sections, setSections] = useState<Section[]>([]);
+  const [loading, setLoading] = useState(true); const [error, setError] = useState('');
   const [filters, setFilters] = useState<QuestionFilters>({ page: 1, limit: 20 });
   const [editing, setEditing] = useState<AdminQuestion | StudentQuestion | null>(null);
-  const [preview, setPreview] = useState<AdminQuestion | null>(null);
-  const [formOpen, setFormOpen] = useState(false);
+  const [preview, setPreview] = useState<AdminQuestion | null>(null); const [formOpen, setFormOpen] = useState(false);
   const [changingId, setChangingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
-    try {
-      const data = await questionsApi.list(filters);
-      setResult(data);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+    try { setResult(await questionsApi.list(filters)); } catch (err) { setError(errorMessage(err)); } finally { setLoading(false); }
   }, [filters]);
-
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
     let cancelled = false;
     async function loadMetadata() {
       try {
-        const examData = await examsApi.list(true);
-        if (cancelled) return;
-        setExams(examData);
+        const examData = await examsApi.list(true); if (cancelled) return; setExams(examData);
         const sectionLists = await Promise.all(examData.map(exam => examsApi.listSections(exam._id, true)));
         if (!cancelled) setSections(sectionLists.flat());
-      } catch (err) {
-        if (!cancelled) setError(errorMessage(err));
-      }
+      } catch (err) { if (!cancelled) setError(errorMessage(err)); }
     }
-    void loadMetadata();
-    return () => { cancelled = true; };
+    void loadMetadata(); return () => { cancelled = true; };
   }, []);
 
   const sectionNames = useMemo(() => new Map(sections.map(section => [section._id, section.name])), [sections]);
-
-  function setFilter<K extends keyof QuestionFilters>(key: K, value: QuestionFilters[K] | undefined) {
-    setFilters(current => ({ ...current, [key]: value, page: 1 }));
-  }
+  function setFilter<K extends keyof QuestionFilters>(key: K, value: QuestionFilters[K] | undefined) { setFilters(current => ({ ...current, [key]: value, page: 1 })); }
 
   async function openPreview(question: StudentQuestion) {
     setError('');
-    try {
-      const data = await questionsApi.get(question._id);
-      if ('correctOptions' in data) setPreview(data);
-      else setError('The server did not return the authorized admin answer key.');
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    try { const data = await questionsApi.get(question._id); if ('correctOptions' in data) setPreview(data); else setError('The server did not return the authorized admin answer key.'); }
+    catch (err) { setError(errorMessage(err)); }
   }
-
   async function openEdit(question: StudentQuestion) {
     setError('');
-    try {
-      const data = await questionsApi.get(question._id);
-      setEditing(data);
-    } catch (err) {
-      if (error instanceof ApiClientError && error.status === 404) setEditing(question);
-      else setError(errorMessage(err));
+    try { setEditing(await questionsApi.get(question._id)); }
+    catch (err) {
+      if (err instanceof ApiClientError && err.status === 404) setEditing(question);
+      else { setError(errorMessage(err)); return; }
     }
     setFormOpen(true);
   }
-
   async function toggleActive(question: StudentQuestion) {
     if (changingId === question._id) return;
-    if (question.isActive && !window.confirm(`Are you sure you want to deactivate this question?`)) return;
+    if (question.isActive && !window.confirm('Are you sure you want to deactivate this question?')) return;
     setChangingId(question._id); setError('');
     try {
-      const updated = question.isActive
-        ? await questionsApi.deactivate(question._id)
-        : await questionsApi.update(question._id, { isActive: true });
+      const updated = question.isActive ? await questionsApi.deactivate(question._id) : await questionsApi.update(question._id, { isActive: true });
       setResult(current => ({ ...current, items: current.items.map(item => item._id === updated._id ? { ...item, isActive: updated.isActive } : item) }));
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setChangingId(null);
-    }
+    } catch (err) { setError(errorMessage(err)); } finally { setChangingId(null); }
   }
-
   function handleSaved(saved: AdminQuestion) {
-    setResult(current => {
-      const exists = current.items.some(item => item._id === saved._id);
-      return exists ? { ...current, items: current.items.map(item => item._id === saved._id ? saved : item) } : { ...current, items: [saved, ...current.items] };
-    });
+    setResult(current => current.items.some(item => item._id === saved._id)
+      ? { ...current, items: current.items.map(item => item._id === saved._id ? saved : item) }
+      : { ...current, items: [saved, ...current.items] });
   }
 
   return <AppShell><Stack spacing={3}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
-      <Stack><Typography variant="h4" fontWeight={800}>Question Bank</Typography><Typography color="text.secondary">Manage questions by exam and section.</Typography></Stack>
-      <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setFormOpen(true); }}>Create question</Button>
-    </Stack>
+    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}><Stack><Typography variant="h4" fontWeight={800}>Question Bank</Typography><Typography color="text.secondary">Manage questions by exam and section.</Typography></Stack><Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setFormOpen(true); }}>Create question</Button></Stack>
     {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
     <Card><CardContent><Grid container spacing={2}>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}><FormControl fullWidth><InputLabel>Exam</InputLabel><Select label="Exam" value={filters.examId ?? ''} onChange={event => setFilter('examId', event.target.value || undefined)}><MenuItem value="">All exams</MenuItem>{exams.map(exam => <MenuItem key={exam._id} value={exam._id}>{exam.name}</MenuItem>)}</Select></FormControl></Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}><FormControl fullWidth><InputLabel>Section</InputLabel><Select label="Section" value={filters.sectionId ?? ''} onChange={event => setFilter('sectionId', event.target.value || undefined)}><MenuItem value="">All sections</MenuItem>{sections.filter(section => !filters.examId || section.examId === filters.examId).map(section => <MenuItem key={section._id} value={section._id}>{section.name}</MenuItem>)}</Select></FormControl></Grid>
       <Grid size={{ xs: 12, sm: 6, md: 2 }}><TextField fullWidth label="Subject" value={filters.subjectTag ?? ''} onChange={event => setFilter('subjectTag', event.target.value || undefined)} /></Grid>
       <Grid size={{ xs: 12, sm: 6, md: 2 }}><TextField fullWidth label="Topic" value={filters.topic ?? ''} onChange={event => setFilter('topic', event.target.value || undefined)} /></Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 2 }}><FormControl fullWidth><InputLabel>Difficulty</InputLabel><Select label="Difficulty" value={filters.difficulty ?? ''} onChange={event => setFilter('difficulty', event.target.value ? event.target.value as QuestionFilters['difficulty'] : undefined)}><MenuItem value="">All</MenuItem><MenuItem value="easy">Easy</MenuItem><MenuItem value="medium">Medium</MenuItem><MenuItem value="hard">Hard</MenuItem></Select></FormControl></Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 2 }}><FormControl fullWidth><InputLabel>Difficulty</InputLabel><Select label="Difficulty" value={filters.difficulty ?? ''} onChange={event => setFilter('difficulty', event.target.value ? difficultyFrom(event.target.value) : undefined)}><MenuItem value="">All</MenuItem><MenuItem value="easy">Easy</MenuItem><MenuItem value="medium">Medium</MenuItem><MenuItem value="hard">Hard</MenuItem></Select></FormControl></Grid>
       <Grid size={{ xs: 12, sm: 6, md: 2 }}><FormControl fullWidth><InputLabel>Status</InputLabel><Select label="Status" value={filters.active === false ? 'inactive' : 'active'} onChange={event => setFilter('active', event.target.value === 'inactive' ? false : true)}><MenuItem value="active">Active</MenuItem><MenuItem value="inactive">Inactive</MenuItem></Select></FormControl></Grid>
     </Grid></CardContent></Card>
-    <Card><CardContent>
-      {loading ? <Typography color="text.secondary">Loading questions...</Typography> : result.items.length === 0 ? <Typography>No questions found.</Typography> : <Stack spacing={1.5}>{result.items.map(question => <Card key={question._id} variant="outlined"><CardContent><Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}><Stack spacing={0.5} sx={{ minWidth: 0 }}><Typography fontWeight={750}>{question.questionText}</Typography><Typography variant="body2" color="text.secondary">{question.subjectTag} · {question.topic} · {sectionNames.get(question.sectionId) ?? question.sectionId}</Typography></Stack><Stack direction="row" spacing={1} flexWrap="wrap"><Chip size="small" label={question.selectionMode === 'single' ? 'Single' : 'Multiple'} /><Chip size="small" label={question.difficulty} /><Chip size="small" label={question.isActive ? 'Active' : 'Inactive'} color={question.isActive ? 'success' : 'default'} /></Stack></Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}><Typography variant="body2"><strong>Marks:</strong> {question.defaultMarks} · <strong>Negative:</strong> {question.negativeMarks}</Typography><Stack direction="row" spacing={1}><Button size="small" startIcon={<VisibilityIcon />} onClick={() => void openPreview(question)}>Preview</Button><Button size="small" startIcon={<EditIcon />} onClick={() => void openEdit(question)}>Edit</Button><Button size="small" color={question.isActive ? 'error' : 'success'} onClick={() => void toggleActive(question)} disabled={changingId === question._id}>{changingId === question._id ? 'Updating...' : question.isActive ? 'Deactivate' : 'Activate'}</Button></Stack></Stack>
-      </Stack></CardContent></Card>)}</Stack>}
-    </CardContent></Card>
+    <Card><CardContent>{loading ? <Typography color="text.secondary">Loading questions...</Typography> : result.items.length === 0 ? <Typography>No questions found.</Typography> : <Stack spacing={1.5}>{result.items.map(question => <Card key={question._id} variant="outlined"><CardContent><Stack spacing={1.5}>
+      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={1}><Stack spacing={0.5} sx={{ minWidth: 0 }}><Typography fontWeight={750}>{question.questionText}</Typography><Typography variant="body2" color="text.secondary">{question.subjectTag} · {question.topic} · {sectionNames.get(question.sectionId) ?? question.sectionId}</Typography></Stack><Stack direction="row" spacing={1} flexWrap="wrap"><Chip size="small" label={question.selectionMode === 'single' ? 'Single' : 'Multiple'} /><Chip size="small" label={question.difficulty} /><Chip size="small" label={question.isActive ? 'Active' : 'Inactive'} color={question.isActive ? 'success' : 'default'} /></Stack></Stack>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}><Typography variant="body2"><strong>Marks:</strong> {question.defaultMarks} · <strong>Negative:</strong> {question.negativeMarks}</Typography><Stack direction="row" spacing={1}><Button size="small" startIcon={<VisibilityIcon />} onClick={() => void openPreview(question)}>Preview</Button><Button size="small" startIcon={<EditIcon />} onClick={() => void openEdit(question)}>Edit</Button><Button size="small" color={question.isActive ? 'error' : 'success'} onClick={() => void toggleActive(question)} disabled={changingId === question._id}>{changingId === question._id ? 'Updating...' : question.isActive ? 'Deactivate' : 'Activate'}</Button></Stack></Stack>
+    </Stack></CardContent></Card>)}</Stack>}</CardContent></Card>
     {result.pagination.pages > 1 && <Stack alignItems="center"><Pagination count={result.pagination.pages} page={result.pagination.page} onChange={(_, page) => setFilters(current => ({ ...current, page }))} color="primary" /></Stack>}
     {formOpen && <QuestionForm question={editing} exams={exams} sections={sections} onSaved={handleSaved} onClose={() => setFormOpen(false)} />}
     {preview && <PreviewDialog question={preview} onClose={() => setPreview(null)} />}
