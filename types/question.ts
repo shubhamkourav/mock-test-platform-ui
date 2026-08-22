@@ -3,6 +3,8 @@ export interface QuestionOption {
   text: string;
 }
 
+export type QuestionSelectionMode = 'single' | 'multiple';
+
 export interface StudentQuestion {
   _id: string;
   sectionId: string;
@@ -10,6 +12,7 @@ export interface StudentQuestion {
   topic: string;
   questionText: string;
   options: QuestionOption[];
+  selectionMode: QuestionSelectionMode;
   explanation?: string;
   defaultMarks: number;
   negativeMarks: number;
@@ -56,6 +59,7 @@ export interface CreateQuestionInput {
   questionText: string;
   options: QuestionOption[];
   correctOptions: string[];
+  selectionMode: QuestionSelectionMode;
   explanation?: string;
   defaultMarks?: number;
   negativeMarks?: number;
