@@ -8,15 +8,15 @@ import { examsApi } from '../lib/api/exams';
 
 vi.mock('./AppShell', () => ({ AppShell: ({ children }: React.PropsWithChildren) => <>{children}</> }));
 vi.mock('../lib/api/questions', () => ({ questionsApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), deactivate: vi.fn() } }));
-vi.mock('../lib/api/exams', () => ({ examsApi: { list: vi.fn(), listSections: vi.fn() } }));
+vi.mock('../lib/api/exams', () => ({ examsApi: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), listSections: vi.fn(), createSection: vi.fn(), updateSection: vi.fn(), deleteSection: vi.fn() } }));
 
 const exam = { _id: 'exam-1', name: 'Mock Exam', slug: 'mock-exam', category: 'General', isActive: true, createdAt: '', updatedAt: '' };
 const section = { _id: 'section-1', examId: 'exam-1', stage: 'prelims', name: 'Math', slug: 'math', subjectTag: 'Math', questionCount: 10, timeMinutes: 20, maxMarks: 10, negativeMarking: 0.25, order: 1, isActive: true, createdAt: '', updatedAt: '' };
-const question = { _id: 'question-1', sectionId: 'section-1', subjectTag: 'Math', topic: 'Algebra', questionText: 'What is 2 + 2?', options: [{ key: 'A', text: '3' }, { key: 'B', text: '4' }], selectionMode: 'single' as const, explanation: 'Basic arithmetic.', defaultMarks: 1, negativeMarks: 0.25, difficulty: 'easy' as const, source: 'manual', language: 'en', isActive: true, createdAt: '', updatedAt: '' };
-const multipleQuestion = { ...question, _id: 'question-2', selectionMode: 'multiple' as const };
-const adminQuestion = { ...question, correctOptions: ['B'] };
+const singleQuestion = { _id: 'question-1', sectionId: 'section-1', subjectTag: 'Math', topic: 'Algebra', questionText: 'What is 2 + 2?', options: [{ key: 'A', text: '3' }, { key: 'B', text: '4' }], selectionMode: 'single' as const, explanation: 'Basic arithmetic.', defaultMarks: 1, negativeMarks: 0.25, difficulty: 'easy' as const, source: 'manual', language: 'en', isActive: true, createdAt: '', updatedAt: '' };
+const multipleQuestion = { ...singleQuestion, _id: 'question-2', selectionMode: 'multiple' as const };
+const adminQuestion = { ...singleQuestion, correctOptions: ['B'] };
 
-function setupList(items = [question]) {
+function setupList(items = [singleQuestion]) {
   vi.mocked(questionsApi.list).mockResolvedValue({ items, pagination: { page: 1, limit: 20, total: items.length, pages: 1 } });
   vi.mocked(examsApi.list).mockResolvedValue([exam]);
   vi.mocked(examsApi.listSections).mockResolvedValue([section]);
@@ -61,14 +61,14 @@ describe('AdminQuestionBank', () => {
   });
 
   it('supports pagination from the API response', async () => {
-    vi.mocked(questionsApi.list).mockResolvedValue({ items: [question], pagination: { page: 1, limit: 20, total: 41, pages: 3 } });
+    vi.mocked(questionsApi.list).mockResolvedValue({ items: [singleQuestion], pagination: { page: 1, limit: 20, total: 41, pages: 3 } });
     root = createRoot(container); await act(async () => { root?.render(<AdminQuestionBank />); }); await flush();
     const pageTwo = document.querySelector('button[aria-label="Go to page 2"]') as HTMLButtonElement;
     expect(pageTwo).toBeTruthy(); await act(async () => pageTwo.click()); await flush();
     expect(questionsApi.list).toHaveBeenCalledWith({ page: 2, limit: 20 });
   });
 
-  it('renders an empty state and API errors safely', async () => {
+  it('renders an empty state safely', async () => {
     vi.mocked(questionsApi.list).mockResolvedValueOnce({ items: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
     root = createRoot(container); await act(async () => { root?.render(<AdminQuestionBank />); }); await flush();
     expect(container.textContent).toContain('No questions found.');
@@ -100,7 +100,7 @@ describe('AdminQuestionBank', () => {
     expect(document.body.textContent).toContain('Correct answer');
   });
 
-  it('creates a question with API-provided selection mode and answer key', async () => {
+  it('creates a single-selection question with the API-provided selection mode and answer key', async () => {
     root = createRoot(container); await act(async () => { root?.render(<AdminQuestionBank />); }); await flush();
     await act(async () => button('Create question').click()); await flush();
     await choose('Exam', 'Mock Exam'); await choose('Section', 'Math');
